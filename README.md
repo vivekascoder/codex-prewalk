@@ -4,13 +4,33 @@ Prewalk for Codex: use a frontier model for repository exploration, planning, an
 
 Based on [Stencil's Prewalk](https://stencil.so/blog/prewalk), `pi-prewalk`, and the implementation upstreamed to `oh-my-pi`.
 
-## 🚀 Setup
+## 🚀 Quick install
 
 Requirements:
 
 - Node.js 18+
+- Git
+- Python 3
 - A current Codex CLI with `codex app-server`
 - Authentication for the planner and executor models
+
+Install or update automatically:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/vivekascoder/codex-prewalk/main/install.sh | bash
+```
+
+The installer:
+
+- clones to `~/plugins/codex-prewalk`
+- updates an existing checkout on reruns
+- adds/updates the `codex-prewalk` entry in `~/.agents/plugins/marketplace.json`
+- preserves other marketplace entries
+- syntax-checks the bundled orchestrator
+
+Restart Codex after installation.
+
+## 🛠️ Manual install
 
 Clone the plugin:
 
@@ -39,6 +59,8 @@ Add it to `~/.agents/plugins/marketplace.json`:
   ]
 }
 ```
+
+If you already have a marketplace file, add only the `codex-prewalk` object to its existing `plugins` array instead of replacing the file.
 
 Restart Codex so it discovers the plugin.
 
@@ -113,6 +135,13 @@ export CODEX_PREWALK_PLANNER=gpt-5.6-sol
 export CODEX_PREWALK_EXECUTOR=gpt-5.6-luna
 export CODEX_PREWALK_PLANNER_EFFORT=high
 export CODEX_PREWALK_EXECUTOR_EFFORT=medium
+```
+
+The installer paths can also be overridden:
+
+```bash
+export CODEX_PREWALK_DIR="$HOME/plugins/codex-prewalk"
+export CODEX_MARKETPLACE_FILE="$HOME/.agents/plugins/marketplace.json"
 ```
 
 > 🧪 The orchestrator has been syntax-checked, but still needs a real end-to-end runtime test in an environment with the Codex CLI installed.
