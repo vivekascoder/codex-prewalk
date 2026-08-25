@@ -8,7 +8,7 @@
   },
   "homepage": "https://github.com/vivekascoder/codex-prewalk",
   "repository": "https://github.com/vivekascoder/codex-prewalk",
-  "license": "MIT",
+  "license": "Apache-2.0",
   "keywords": ["codex", "prewalk", "agent", "model-routing", "coding"],
   "skills": "./skills/",
   "interface": {
