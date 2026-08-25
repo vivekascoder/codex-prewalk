@@ -4,11 +4,64 @@ Prewalk for Codex: use a frontier model for repository exploration, planning, an
 
 Based on [Stencil's Prewalk](https://stencil.so/blog/prewalk), `pi-prewalk`, and the implementation upstreamed to `oh-my-pi`.
 
-## 🧠 Why
+## 🚀 Setup
 
-A normal planner/executor split throws away the useful part of planning: the actual trajectory. The executor receives prose, then re-reads the same files and rediscovers the same constraints.
+Requirements:
 
-Prewalk instead lets the planner explore, build a compact todo list, and make one high-confidence edit. At that boundary the executor inherits the same thread: repository reads, tool outputs, plan state, and the first working implementation pattern.
+- Node.js 18+
+- A current Codex CLI with `codex app-server`
+- Authentication for the planner and executor models
+
+Clone the plugin:
+
+```bash
+git clone https://github.com/vivekascoder/codex-prewalk.git ~/plugins/codex-prewalk
+```
+
+Add it to `~/.agents/plugins/marketplace.json`:
+
+```json
+{
+  "name": "local-plugins",
+  "plugins": [
+    {
+      "name": "codex-prewalk",
+      "source": {
+        "source": "local",
+        "path": "./plugins/codex-prewalk"
+      },
+      "policy": {
+        "installation": "AVAILABLE",
+        "authentication": "ON_INSTALL"
+      },
+      "category": "Developer Tools"
+    }
+  ]
+}
+```
+
+Restart Codex so it discovers the plugin.
+
+## ▶️ Use
+
+The primary interface is the Codex skill:
+
+```text
+$prewalk fix the failing auth refresh tests
+```
+
+or choose `prewalk` from `/skills`.
+
+Defaults:
+
+```text
+planner:          gpt-5.6-sol
+executor:         gpt-5.6-luna
+planner effort:   high
+executor effort:  medium
+```
+
+The bundled `scripts/prewalk.mjs` file is an implementation detail used by the skill; you normally do **not** run it yourself.
 
 ## 🔄 How it works
 
@@ -20,16 +73,14 @@ flowchart LR
     D --> E["✅ Finish + validate"]
 ```
 
-Codex plugin hooks can observe tool calls but do not expose a public operation for changing the active model mid-turn. `codex-prewalk` therefore uses Codex's own `app-server` protocol as a small orchestration layer:
-
-1. 🧭 Start a Codex thread on the planner model (default `gpt-5.6-sol`).
-2. 📝 Add a planner-only Prewalk instruction and wait for a real plan.
-3. ✍️ Wait for the first successful `fileChange`.
+1. 🧭 Start a Codex thread on the planner model.
+2. 📝 Let it inspect the repo and establish a compact plan.
+3. ✍️ Wait for the first successful file edit.
 4. 🔄 Interrupt immediately after that edit lands.
-5. ⚡ Continue the **same thread** on the executor model (default `gpt-5.6-luna`).
+5. ⚡ Continue the **same thread** on the executor model.
 6. ✅ Finish implementation and validation.
 
-There is no prose-plan handoff and no fresh executor thread.
+Codex plugin hooks do not expose a public mid-turn model-switch operation, so the skill delegates to a small orchestrator built on Codex's own `app-server` protocol. There is no prose-plan handoff and no fresh executor thread.
 
 ## 📈 Why this can be faster / cheaper
 
@@ -51,51 +102,11 @@ xychart-beta
 | **Sol → Prewalk → Luna** | **85%** | **$1.04** | **300s** |
 | Sol only | 88% | $1.71 | 372s |
 
-The idea is simple: **pay the frontier-model reading cost once**, then hand the already-grounded trajectory to the cheaper executor after the first confident edit.
+The idea: **pay the frontier-model reading cost once**, then hand the already-grounded trajectory to the cheaper executor after the first confident edit.
 
-## 🚀 Setup
+## ⚙️ Configuration
 
-Requirements:
-
-- Node.js 18+
-- A current Codex CLI with `codex app-server`
-- Authentication/configuration for both selected models
-
-Clone the repo:
-
-```bash
-git clone https://github.com/vivekascoder/codex-prefill.git
-cd codex-prefill
-```
-
-Check that Codex app-server is available:
-
-```bash
-codex app-server
-```
-
-## ▶️ Run
-
-Run Prewalk directly:
-
-```bash
-node scripts/prewalk.mjs \
-  --planner gpt-5.6-sol \
-  --executor gpt-5.6-luna \
-  "fix the failing auth refresh tests"
-```
-
-Useful options:
-
-```text
---planner <model>          default: gpt-5.6-sol
---executor <model>         default: gpt-5.6-luna
---planner-effort <level>   default: high
---executor-effort <level>  default: medium
---cwd <path>               default: current directory
-```
-
-Or configure defaults with environment variables:
+Override defaults with environment variables:
 
 ```bash
 export CODEX_PREWALK_PLANNER=gpt-5.6-sol
@@ -103,17 +114,5 @@ export CODEX_PREWALK_EXECUTOR=gpt-5.6-luna
 export CODEX_PREWALK_PLANNER_EFFORT=high
 export CODEX_PREWALK_EXECUTOR_EFFORT=medium
 ```
-
-Then:
-
-```bash
-node scripts/prewalk.mjs "your task here"
-```
-
-## ⚙️ Implementation note
-
-Pi exposes a direct in-process `setModel` API, so `pi-prewalk` can switch models inside one running agent turn. Codex does not expose that operation to plugin hooks today.
-
-This implementation reaches the same practical handoff boundary through `app-server`: interrupt after the first successful edit, then issue an empty-input continuation on the same persisted thread with the executor model.
 
 > 🧪 The orchestrator has been syntax-checked, but still needs a real end-to-end runtime test in an environment with the Codex CLI installed.
