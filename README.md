@@ -132,6 +132,10 @@ export CODEX_PREWALK_SKILL_DIR="$HOME/.agents/skills/prewalk"
 
 > 🧪 Runtime testing found and fixed a Codex app-server compatibility issue: the current sandbox enum is `workspace-write`, not the older `workspaceWrite` value.
 
+## License
+
+Licensed under the [Apache License 2.0](LICENSE). Commercial use, modification, and redistribution are allowed. Redistributions and derivative works must preserve the applicable attribution notice in [NOTICE](NOTICE), which identifies the original project at `https://github.com/vivekascoder/codex-prewalk`.
+
 ## Contributing
 
 If you're interested in contributing to codex-prewalk, please read [our contributing docs](CONTRIBUTING.md) before submitting a pull request.
