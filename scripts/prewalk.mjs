@@ -14,13 +14,18 @@ Work on the user's task normally, but front-load the difficult reasoning before 
 
 Do not write a prose handoff document. The executor will inherit this same thread trajectory, tool results, plan state, and your first successful edit.`;
 
+const CONTINUE_PROMPT = `Continue the existing Prewalk planner trajectory on this same thread.
+If the plan is already ready, do not restate it or stop at planning. Start implementing the first concrete plan item now and make a real file edit.
+If more repository inspection is genuinely required before editing, do only the minimum needed, then implement.
+Do not finish this turn with prose-only planning.`;
+
 const EXECUTOR_PROMPT = `You are the executor half of a Prewalk handoff.
 The same thread was just explored and planned by a stronger model, and at least one successful file edit has already landed.
 Continue directly from that trajectory. Do not restart repository reconnaissance or rewrite the plan from scratch unless new evidence requires it.
 Use the existing plan as the source of truth, complete the remaining implementation, run the validations called for by the plan, fix failures, and finish the user's task.`;
 
 function usage() {
-  return `Usage: prewalk [options] <task>\n\nOptions:\n  --planner <model>          Planner model (default: gpt-5.6-sol)\n  --executor <model>         Executor model (default: gpt-5.6-luna)\n  --planner-effort <level>   Planner reasoning effort (default: high)\n  --executor-effort <level>  Executor reasoning effort (default: medium)\n  --cwd <path>               Working directory (default: current directory)\n  --help                     Show this help`;
+  return `Usage: prewalk [options] <task>\n\nOptions:\n  --planner <model>          Planner model (default: gpt-5.6-sol)\n  --executor <model>         Executor model (default: gpt-5.6-luna)\n  --planner-effort <level>   Planner reasoning effort (default: high)\n  --executor-effort <level>  Executor reasoning effort (default: medium)\n  --planner-continuations <n> Max extra planner turns before failing (default: 3)\n  --cwd <path>               Working directory (default: current directory)\n  --help                     Show this help`;
 }
 
 function parseArgs(argv) {
@@ -29,6 +34,7 @@ function parseArgs(argv) {
     executor: process.env.CODEX_PREWALK_EXECUTOR || 'gpt-5.6-luna',
     plannerEffort: process.env.CODEX_PREWALK_PLANNER_EFFORT || 'high',
     executorEffort: process.env.CODEX_PREWALK_EXECUTOR_EFFORT || 'medium',
+    plannerContinuations: Number(process.env.CODEX_PREWALK_PLANNER_CONTINUATIONS || 3),
     cwd: process.cwd(),
     task: '',
   };
@@ -45,8 +51,12 @@ function parseArgs(argv) {
     else if (arg === '--executor') out.executor = next();
     else if (arg === '--planner-effort') out.plannerEffort = next();
     else if (arg === '--executor-effort') out.executorEffort = next();
+    else if (arg === '--planner-continuations') out.plannerContinuations = Number(next());
     else if (arg === '--cwd') out.cwd = next();
     else rest.push(arg);
+  }
+  if (!Number.isInteger(out.plannerContinuations) || out.plannerContinuations < 0 || out.plannerContinuations > 10) {
+    throw new Error('--planner-continuations must be an integer between 0 and 10');
   }
   out.task = rest.join(' ').trim();
   return out;
@@ -218,41 +228,57 @@ async function main() {
     let planReady = false;
     let handoffRequested = false;
     let plannerTurnId;
+    let plannerTurns = 0;
 
-    const plannerPromise = runTurn(client, {
-      threadId,
-      input: [{ type: 'text', text: args.task }],
-      model: args.planner,
-      effort: args.plannerEffort,
-      collaborationMode: collaborationMode(args.planner, args.plannerEffort, PLAN_PROMPT),
-    }, {
-      onEvent(message, activeTurnId) {
-        plannerTurnId = activeTurnId || plannerTurnId;
-        const p = message.params ?? {};
-        if (message.method === 'turn/plan/updated' && Array.isArray(p.plan) && p.plan.length > 0) {
-          planReady = true;
-          console.error(`[prewalk] plan ready (${p.plan.length} items)`);
-        }
-        if (message.method === 'item/completed') {
-          const item = p.item;
-          if (item?.type === 'fileChange' && item.status === 'completed') {
-            const paths = Array.isArray(item.changes) ? item.changes.map(change => change.path).filter(Boolean) : [];
-            console.error(`[prewalk] planner edit landed${paths.length ? `: ${paths.join(', ')}` : ''}`);
-            if (planReady && !handoffRequested && plannerTurnId) {
-              handoffRequested = true;
-              console.error('[prewalk] handoff boundary reached; interrupting planner');
-              client.request('turn/interrupt', { threadId, turnId: plannerTurnId }).catch(() => {});
+    const runPlannerTurn = async ({ initial = false } = {}) => {
+      plannerTurns += 1;
+      plannerTurnId = undefined;
+      await runTurn(client, {
+        threadId,
+        input: initial ? [{ type: 'text', text: args.task }] : [],
+        model: args.planner,
+        effort: args.plannerEffort,
+        collaborationMode: collaborationMode(
+          args.planner,
+          args.plannerEffort,
+          initial ? PLAN_PROMPT : CONTINUE_PROMPT,
+        ),
+      }, {
+        onEvent(message, activeTurnId) {
+          plannerTurnId = activeTurnId || plannerTurnId;
+          const p = message.params ?? {};
+          if (message.method === 'turn/plan/updated' && Array.isArray(p.plan) && p.plan.length > 0) {
+            planReady = true;
+            console.error(`[prewalk] plan ready (${p.plan.length} items)`);
+          }
+          if (message.method === 'item/completed') {
+            const item = p.item;
+            if (item?.type === 'fileChange' && item.status === 'completed') {
+              const paths = Array.isArray(item.changes) ? item.changes.map(change => change.path).filter(Boolean) : [];
+              console.error(`[prewalk] planner edit landed${paths.length ? `: ${paths.join(', ')}` : ''}`);
+              if (planReady && !handoffRequested && plannerTurnId) {
+                handoffRequested = true;
+                console.error('[prewalk] handoff boundary reached; interrupting planner');
+                client.request('turn/interrupt', { threadId, turnId: plannerTurnId }).catch(() => {});
+              }
             }
           }
-        }
-      },
-    });
+        },
+      });
+    };
 
-    await plannerPromise;
+    await runPlannerTurn({ initial: true });
+
+    let continuations = 0;
+    while (!handoffRequested && continuations < args.plannerContinuations) {
+      continuations += 1;
+      const reason = planReady ? 'plan is ready but no edit landed' : 'planner stopped before establishing the edit boundary';
+      console.error(`[prewalk] ${reason}; continuing planner (${continuations}/${args.plannerContinuations})`);
+      await runPlannerTurn();
+    }
 
     if (!handoffRequested) {
-      console.error('[prewalk] planner finished before a todo-gated edit boundary; no executor handoff was needed.');
-      return;
+      throw new Error(`planner did not reach a todo-gated successful edit after ${plannerTurns} planner turn${plannerTurns === 1 ? '' : 's'}`);
     }
 
     console.error(`[prewalk] switched trajectory to ${args.executor}`);
