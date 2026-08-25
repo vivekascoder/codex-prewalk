@@ -57,10 +57,11 @@ or choose `prewalk` from `/skills`.
 Defaults:
 
 ```text
-planner:          gpt-5.6-sol
-executor:         gpt-5.6-luna
-planner effort:   high
-executor effort:  medium
+planner:                gpt-5.6-sol
+executor:               gpt-5.6-luna
+planner effort:         high
+executor effort:        medium
+planner continuations:  3
 ```
 
 The bundled `scripts/prewalk.mjs` file is an implementation detail used by the skill; you normally do **not** run it yourself.
@@ -70,17 +71,21 @@ The bundled `scripts/prewalk.mjs` file is an implementation detail used by the s
 ```mermaid
 flowchart LR
     A["🧠 Frontier planner<br/>explore + reason"] --> B["📝 Compact todo plan"]
-    B --> C["✍️ First successful edit"]
-    C --> D["⚡ Fast executor<br/>same Codex thread"]
+    B --> C{"✍️ First successful edit?"}
+    C -- "not yet" --> B
+    C -- "yes" --> D["⚡ Fast executor<br/>same Codex thread"]
     D --> E["✅ Finish + validate"]
 ```
 
 1. 🧭 Start a Codex thread on the planner model.
 2. 📝 Let it inspect the repo and establish a compact plan.
-3. ✍️ Wait for the first successful file edit.
-4. 🔄 Interrupt immediately after that edit lands.
-5. ⚡ Continue the **same thread** on the executor model.
-6. ✅ Finish implementation and validation.
+3. ↩️ If the planner ends a turn before editing, continue the planner on the **same thread** with an implementation nudge.
+4. ✍️ Wait for the first successful file edit.
+5. 🔄 Interrupt immediately after that edit lands.
+6. ⚡ Continue the **same thread** on the executor model.
+7. ✅ Finish implementation and validation.
+
+Planner continuation is bounded (3 extra turns by default). If the planner still cannot reach a plan + successful-edit boundary, Prewalk exits with an error instead of pretending the handoff was unnecessary.
 
 Codex does not expose a public mid-turn model-switch operation to skills, so Prewalk delegates to a small orchestrator built on Codex's own `app-server` protocol. There is no prose-plan handoff and no fresh executor thread.
 
@@ -115,6 +120,7 @@ export CODEX_PREWALK_PLANNER=gpt-5.6-sol
 export CODEX_PREWALK_EXECUTOR=gpt-5.6-luna
 export CODEX_PREWALK_PLANNER_EFFORT=high
 export CODEX_PREWALK_EXECUTOR_EFFORT=medium
+export CODEX_PREWALK_PLANNER_CONTINUATIONS=3
 ```
 
 Installer paths can also be overridden:
@@ -125,3 +131,7 @@ export CODEX_PREWALK_SKILL_DIR="$HOME/.agents/skills/prewalk"
 ```
 
 > 🧪 Runtime testing found and fixed a Codex app-server compatibility issue: the current sandbox enum is `workspace-write`, not the older `workspaceWrite` value.
+
+## Contributing
+
+If you're interested in contributing to codex-prewalk, please read [our contributing docs](CONTRIBUTING.md) before submitting a pull request.
