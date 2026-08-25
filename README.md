@@ -10,7 +10,6 @@ Requirements:
 
 - Node.js 18+
 - Git
-- Python 3
 - A current Codex CLI with `codex app-server`
 - Authentication for the planner and executor models
 
@@ -22,51 +21,32 @@ curl -fsSL https://raw.githubusercontent.com/vivekascoder/codex-prewalk/main/ins
 
 The installer:
 
-- clones to `~/plugins/codex-prewalk`
-- updates an existing checkout on reruns
-- adds/updates the `codex-prewalk` entry in `~/.agents/plugins/marketplace.json`
-- preserves other marketplace entries
-- syntax-checks the bundled orchestrator
+- clones/updates the repo at `~/.local/share/codex-prewalk`
+- exposes the user skill at `~/.agents/skills/prewalk`
+- uses a symlink, so updates do not duplicate files
+- removes only the stale `codex-prewalk` marketplace entry created by older installer versions
+- syntax-checks the orchestrator
 
 Restart Codex after installation.
 
 ## 🛠️ Manual install
 
-Clone the plugin:
+Clone the repo:
 
 ```bash
-git clone https://github.com/vivekascoder/codex-prewalk.git ~/plugins/codex-prewalk
+git clone https://github.com/vivekascoder/codex-prewalk.git ~/.local/share/codex-prewalk
 ```
 
-Add it to `~/.agents/plugins/marketplace.json`:
+Expose the skill where Codex discovers user skills:
 
-```json
-{
-  "name": "local-plugins",
-  "plugins": [
-    {
-      "name": "codex-prewalk",
-      "source": {
-        "source": "local",
-        "path": "./plugins/codex-prewalk"
-      },
-      "policy": {
-        "installation": "AVAILABLE",
-        "authentication": "ON_INSTALL"
-      },
-      "category": "Developer Tools"
-    }
-  ]
-}
+```bash
+mkdir -p ~/.agents/skills
+ln -s ~/.local/share/codex-prewalk/skills/prewalk ~/.agents/skills/prewalk
 ```
 
-If you already have a marketplace file, add only the `codex-prewalk` object to its existing `plugins` array instead of replacing the file.
-
-Restart Codex so it discovers the plugin.
+Codex supports symlinked skill folders. Restart Codex after installation.
 
 ## ▶️ Use
-
-The primary interface is the Codex skill:
 
 ```text
 $prewalk fix the failing auth refresh tests
@@ -102,7 +82,7 @@ flowchart LR
 5. ⚡ Continue the **same thread** on the executor model.
 6. ✅ Finish implementation and validation.
 
-Codex plugin hooks do not expose a public mid-turn model-switch operation, so the skill delegates to a small orchestrator built on Codex's own `app-server` protocol. There is no prose-plan handoff and no fresh executor thread.
+Codex does not expose a public mid-turn model-switch operation to skills, so Prewalk delegates to a small orchestrator built on Codex's own `app-server` protocol. There is no prose-plan handoff and no fresh executor thread.
 
 ## 📈 Why this can be faster / cheaper
 
@@ -137,11 +117,11 @@ export CODEX_PREWALK_PLANNER_EFFORT=high
 export CODEX_PREWALK_EXECUTOR_EFFORT=medium
 ```
 
-The installer paths can also be overridden:
+Installer paths can also be overridden:
 
 ```bash
-export CODEX_PREWALK_DIR="$HOME/plugins/codex-prewalk"
-export CODEX_MARKETPLACE_FILE="$HOME/.agents/plugins/marketplace.json"
+export CODEX_PREWALK_DIR="$HOME/.local/share/codex-prewalk"
+export CODEX_PREWALK_SKILL_DIR="$HOME/.agents/skills/prewalk"
 ```
 
-> 🧪 The orchestrator has been syntax-checked, but still needs a real end-to-end runtime test in an environment with the Codex CLI installed.
+> 🧪 Runtime testing found and fixed a Codex app-server compatibility issue: the current sandbox enum is `workspace-write`, not the older `workspaceWrite` value.
