@@ -22,9 +22,12 @@ The orchestrator:
 2. Supplies the Prewalk planning nudge as turn-scoped developer instructions.
 3. Requires the planner to inspect the repository, establish a compact plan/todo list, and begin implementation.
 4. Watches `turn/plan/updated` and successful `fileChange` events.
-5. Once a plan exists and the first successful file edit lands, interrupts the planner turn.
-6. Starts an empty-input continuation turn on the same thread with the executor model.
-7. Lets the executor finish implementation and validation from the inherited trajectory.
+5. If the planner finishes a turn before the first edit lands, continues the planner on the same thread with an implementation nudge (up to the configured continuation limit).
+6. Once a plan exists and the first successful file edit lands, interrupts the planner turn.
+7. Starts an empty-input continuation turn on the same thread with the executor model.
+8. Lets the executor finish implementation and validation from the inherited trajectory.
+
+If the planner never reaches the plan + successful-edit boundary within the continuation limit, the orchestrator exits non-zero instead of treating the run as successful.
 
 ## Defaults
 
@@ -32,8 +35,9 @@ The orchestrator:
 - executor: `gpt-5.6-luna`
 - planner effort: `high`
 - executor effort: `medium`
+- planner continuations: `3`
 
-Environment overrides: `CODEX_PREWALK_PLANNER`, `CODEX_PREWALK_EXECUTOR`, `CODEX_PREWALK_PLANNER_EFFORT`, and `CODEX_PREWALK_EXECUTOR_EFFORT`.
+Environment overrides: `CODEX_PREWALK_PLANNER`, `CODEX_PREWALK_EXECUTOR`, `CODEX_PREWALK_PLANNER_EFFORT`, `CODEX_PREWALK_EXECUTOR_EFFORT`, and `CODEX_PREWALK_PLANNER_CONTINUATIONS`.
 
 ## Constraints
 
