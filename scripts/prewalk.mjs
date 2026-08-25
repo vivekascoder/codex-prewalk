@@ -118,9 +118,6 @@ class AppServerClient {
   }
 
   handleServerRequest(msg) {
-    // The nested run stays workspace-sandboxed and uses approvalPolicy=never. If a
-    // model/provider still emits an approval request, only accept ordinary file/
-    // command approval requests; do not grant extra permissions or elicitations.
     if (msg.method === 'item/commandExecution/requestApproval' || msg.method === 'item/fileChange/requestApproval') {
       this.send({ id: msg.id, result: { decision: 'accept' } });
       return;
@@ -136,9 +133,7 @@ class AppServerClient {
     this.send({ id: msg.id, error: { code: -32601, message: `Unsupported server request: ${msg.method}` } });
   }
 
-  send(message) {
-    this.proc.stdin.write(`${JSON.stringify(message)}\n`);
-  }
+  send(message) { this.proc.stdin.write(`${JSON.stringify(message)}\n`); }
   notify(method, params = {}) { this.send({ method, params }); }
   request(method, params = {}) {
     const id = this.nextId++;
@@ -214,7 +209,7 @@ async function main() {
       model: args.planner,
       cwd: args.cwd,
       approvalPolicy: 'never',
-      sandbox: 'workspaceWrite',
+      sandbox: 'workspace-write',
       serviceName: 'codex-prewalk',
     });
     const threadId = threadStart.thread?.id;
