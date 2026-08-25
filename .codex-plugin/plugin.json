@@ -1,0 +1,27 @@
+{
+  "name": "codex-prewalk",
+  "version": "0.1.0",
+  "description": "Prewalk-style planner-to-executor trajectory handoff for Codex.",
+  "author": {
+    "name": "Vivek",
+    "url": "https://github.com/vivekascoder"
+  },
+  "homepage": "https://github.com/vivekascoder/codex-prewalk",
+  "repository": "https://github.com/vivekascoder/codex-prewalk",
+  "license": "MIT",
+  "keywords": ["codex", "prewalk", "agent", "model-routing", "coding"],
+  "skills": "./skills/",
+  "interface": {
+    "displayName": "Codex Prewalk",
+    "shortDescription": "Plan with Sol, execute with Luna",
+    "longDescription": "Runs a coding task on a stronger planner until its plan is ready and the first successful edit lands, then interrupts that turn and continues the same Codex thread on a faster executor model.",
+    "developerName": "Vivek",
+    "category": "Developer Tools",
+    "capabilities": ["Interactive", "Write"],
+    "websiteURL": "https://github.com/vivekascoder/codex-prewalk",
+    "defaultPrompt": [
+      "Use Prewalk to implement this task",
+      "Prewalk this fix with Sol then Luna"
+    ]
+  }
+}
