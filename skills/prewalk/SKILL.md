@@ -1,11 +1,11 @@
 ---
 name: prewalk
-description: Use when the user wants a coding task executed with a strong planner model first and a faster/cheaper executor model after the first successful implementation edit.
+description: Run a coding task with a strong planner first, then hand off the same Codex thread to a faster/cheaper executor after the first successful implementation edit. Invoke as $prewalk <task>.
 ---
 
 # Prewalk
 
-Use the bundled `scripts/prewalk.mjs` orchestrator instead of manually simulating the workflow in the current Codex turn.
+When invoked as `$prewalk <task>`, run the bundled `scripts/prewalk.mjs` orchestrator for the user's task instead of manually simulating the workflow in the current Codex turn.
 
 ## Behavior
 
@@ -33,6 +33,8 @@ node "<plugin-root>/scripts/prewalk.mjs" \
   --executor gpt-5.6-luna \
   "<user task>"
 ```
+
+Preserve the user's task text exactly when passing it to the orchestrator.
 
 Optional flags:
 
